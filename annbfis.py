@@ -239,36 +239,37 @@ class ANNBFIS:
 
         return V, S, U, XB, FS, SC, VAL
     
-    def annbfise(self) -> np.ndarray:
+    def annbfise(self, test_set: np.ndarray) -> np.ndarray:
         ''' 
         Method for evaluation of the ANNBFIS model
 
-        IMPORTANT
+        requires:
         ---------------------------------------------------
-            for now, this version of the annbfise method 
-            uses the same dataset for testing and training
-            (it's just a temporary solution to verify the 
-            structure of the algorithm)
-        ---------------------------------------------------
+        test_set: np.ndarray
+            data set for checking
+        returns:
+        --------------------------------------------
+        out: np.ndarray
+            classification results
         '''
 
         if not hasattr(self, 'w'):
             self.w = self.annbfis()        
         
         (a, ww, c, s) = self.w
-        n1, m1 = np.shape(self.data)
+        n1, m1 = np.shape(test_set)
         _, m = np.shape(ww)         # just to get no. if-then rules
 
         out = np.zeros((n1,1))
         for n in range(n1):
-            d1 = self.data[n,:m1-1].T.reshape(-1,1) * np.ones((1,m)) - c
+            d1 = test_set[n,:m1-1].T.reshape(-1,1) * np.ones((1,m)) - c
             d2 = d1 / s
             d3 = d2 * d2
             d4 = -0.5 * np.sum(d3, axis=0)
             R = np.exp(d4)
             mi = (R * ww) / 2
             [[z]] = np.dot(np.ones((1,m)),mi.T)
-            aa = (np.dot(self.data[m,:m1-1], a[:m1-1,:])) + a[m1-1,:]
+            aa = (np.dot(test_set[m,:m1-1], a[:m1-1,:])) + a[m1-1,:]
             [out[n,0]] = (np.dot(aa,mi.T)) / z
         
         return out
