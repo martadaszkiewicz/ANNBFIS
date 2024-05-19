@@ -21,32 +21,38 @@ class ANNBFIS:
         self.nrule = nrule
     
     def annbfis(self) -> tuple:
-        n1, m1 = np.shape(self.data)
-        iter = 100
-        # c, s, cc = self.cclust(self.data[:,:-1], self.nrule, self.nrule, 4)
+        np.random.seed(2024)            # setting a seed to examine observed results
+
+        n1, m1 = np.shape(self.data)        # n1 <- no. cases, m1 <- no. inputs+1
+        iter = 100                          # target no. iterations (epoches)
         c, s, cc = self.cclust(4)
 
-        c = c[:,:m1-1].T
-        s = s[:,:m1-1].T
-        m = cc
-        ss = 0.01
-        a = np.zeros((m1, m))
-        ww = 2* np.ones((1,m))
-        co = 0
-        EEMIN = 1E100
-        print(EEMIN)
-        lasti = 1
-        lastd = 1
-        EE = np.zeros((iter,1))
+        c = c[:,:m1-1].T                    # premises centers
+        s = s[:,:m1-1].T                    # premises sigma-parameters
+        m = cc                              # no. IF-THEN rules
+        ss = 0.01                           # initial step-size
+        a = np.zeros((m1, m))               # localization of fuzzy sets in consequence
+        ww = 2* np.ones((1,m))              # width of fuzzy sets in consequence
+        co = 0                              # optimization method selector
+        EEMIN = 1E100                       # minimal criterion error
+        lasti = 1                           # last step-size increasing index
+        lastd = 1                           # last step-size decreasing index
+        EE = np.zeros((iter,1))             # criterion error in learning epoch
 
+        ##############<Classifier based on neurofuzzy system>############## 
+        org_labels = np.copy(self.data[:,m1-1]).reshape(1,-1)
+        mod_labels = np.zeros((iter+1,n1))
+        mod_labels[0,:] = np.ones((1,n1))
+        gamma = 1.5                             # gamma = (0:0.5:2>
+        ##############</Classifier based on neurofuzzy system>############## 
         print('- loop under learning epoch.\n')
         for I in range(iter):
             Ist = ' '
-            if co == 0:
+            if co == 0:                     # LMSE method initialiization
                 P = 10E6 * np.array(np.eye(m1*m), dtype=float)
                 ak = np.zeros((m1*m,1))
 
-            if co == 1:
+            if co == 1:                     # gradient method initialization
                 gc = np.zeros((m1-1,m))
                 gs = np.zeros((m1-1,m))
                 gw = np.zeros((1,m))
@@ -62,12 +68,23 @@ class ANNBFIS:
                 [[z]] = np.dot(np.ones((1,m)), mi.T)
                 aa = np.dot(self.data[n,:m1-1], a[:m1-1,:]) + a[m1-1,:]
                 [y] = (np.dot(aa, mi.T)) / z
-                e = np.abs(self.data[n,m1-1] - y)
+
+                ##############<Classifier based on neurofuzzy system>############## 
+                e_k = org_labels[0,n]*y - mod_labels[I,n]
+                if e_k > 0:
+                    mod_labels[I+1,n] = mod_labels[I,n] + gamma*e_k
+                    y = mod_labels[I,n] + gamma*e_k
+                else:
+                    mod_labels[I+1,n] = mod_labels[I,n]
+                    y = mod_labels[I,n]
+                ##############</Classifier based on neurofuzzy system>##############
+
+                e = np.abs(self.data[n,m1-1] - y)           # error
                 EE[I,0] = EE[I,0] + e*e
-                if co == 0:
+                if co == 0:                     # LMSE method
                     mi1 = mi / z
                     M = np.append(self.data[n,:m1-1].T,1).reshape(-1,1) * mi1
-                    Rk = M.flatten('F').reshape(-1,1)   
+                    Rk = M.flatten('F').reshape(-1,1)
                     P = P - (np.dot(np.dot(np.dot(P, Rk), Rk.T), P) / (np.dot(np.dot(Rk.T, P), Rk) + 1))
                     
                     ak = ak + np.dot(np.dot(P, Rk), (self.data[n,m1-1] - np.dot(Rk.T, ak)))
@@ -76,16 +93,16 @@ class ANNBFIS:
                         a[:] = ak.reshape(-1,a.shape[0]).T
             
             
-                if co == 1:     # gradient method
+                if co == 1:                     # gradient method
                     ay = (np.ones((m1-1,1))*aa - y) / z
                     gc = gc + np.dot((self.data[n,m1-1] - y), ay) * (np.ones((m1-1,1)) * mi) * (d1 / (s*s))
                     gs = gs + np.dot((self.data[n,m1-1] - y), ay) * (np.ones((m1-1,1)) * mi) * ((d1*d1) / (s*s*s))
                     gw = gw + np.dot((self.data[n,m1-1] - y), ((aa - y) / z)) * (R/2)
 
-            if co == 1:     # a huge if
-                if EEMIN > EE[I,0]:
+            if co == 1:                         # gradient method 
+                if EEMIN > EE[I,0]:             # the smallest error in this epoch
                     Ist = '<--'
-                    self.w = (a, ww, c, s)   # parameters to output in a tuple
+                    self.w = (a, ww, c, s)      # parameters to output in a tuple
 
                 if (I - lasti) > 8:
                     if (EE[I,0] < EE[I-2,0]) and (EE[I-2,0] < EE[I-4,0]) and (EE[I-4,0] < EE[I-6,0]) and (EE[I-6,0] < EE[I-8,0]):
@@ -99,7 +116,7 @@ class ANNBFIS:
                         lastd = I
                 
                 Sss = ss / np.sqrt(np.sum(gc*gc) + np.sum(gs*gs) + np.sum(gw*gw))
-                c = c + Sss * gc
+                c = c + Sss * gc                # parameters modifications
                 s = s + Sss * gs
                 ww = ww + Sss * gw
             co = np.mod(co+1,2)
@@ -126,7 +143,6 @@ class ANNBFIS:
             cc: optimal number of clusters
         '''
 
-        # def cclust(data: np.ndarray, mincl_n: int, maxcl_n: int, ni: int):
         wsk = 1E30
         mincl_n = self.nrule
         maxcl_n = self.nrule
@@ -137,9 +153,10 @@ class ANNBFIS:
                 c1, s1, U, XB, FS, SC, VAL = self.cluster(i)
                 if VAL < wsk:
                     wsk = VAL
-                    c = c1
-                    s = s1
-                    cc = i
+                    c = c1              # cluster centers
+                    s = s1              # cluster variability
+                    cc = i              # optimal no. clusters
+        
         print(f'Minimal Value of index: {wsk:4f}\n')
         print(f'Number of Clusters: {cc}\n')
         
@@ -170,11 +187,11 @@ class ANNBFIS:
         data = np.copy(self.data[:,:-1])
         # initial parameters
         n1, n2 = np.shape(data)
-        m = 2
-        iter = 500
-        Jm_d = 10**(-5)
+        m = 2                                       # exponent parameter
+        iter = 500                                  # no. iterations
+        Jm_d = 10**(-5)                             # criterion decreasing
         Jm = np.zeros((iter,1))
-        U = np.random.uniform(0, 1, (n_clust,n1))
+        U = np.random.uniform(0, 1, (n_clust,n1))   # initialization of partition
         sum_c = U.sum(axis=0)
         temp_U = np.zeros((n_clust,n1))
         temp_U[:,:] = sum_c
@@ -188,15 +205,15 @@ class ANNBFIS:
             for k in range(n_clust):
                 DD[k,:] = np.sqrt(np.sum(((data - np.ones((n1,1)) * V[k,:])**(2)).T, axis=0))
             
-            Jm[i,0] = np.sum(np.sum(((DD**(2))*Um), axis=0))
-            U_new = DD**(-2/(m-1))
+            Jm[i,0] = np.sum(np.sum(((DD**(2))*Um), axis=0))        # criterion function
+            U_new = DD**(-2/(m-1))                                  # update U
             U = U_new / (np.ones((n_clust,1)) * sum(U_new))
 
             if i > 0:
                 if np.abs(Jm[i,0] - Jm[i-1,0]) < Jm_d:
                     break
         
-        Um = U**(2)
+        Um = U**(m)
         V2 = Jm[i,0] / n1
         V1 = 1E23
         for i in range(n_clust-1):
@@ -205,17 +222,17 @@ class ANNBFIS:
                 if tm < V1:
                     V1 = np.copy(tm)
         
-        XB = V2 / V1
+        XB = V2 / V1                # Xie-Beni index
         VG = np.mean(data, axis=0)
         tm = np.sum(Um.T, axis=0)
-        FS = Jm[i,0] - np.sum(tm * np.sum((V - (np.ones((n_clust,1)) * VG))**(2), axis=1))
+        FS = Jm[i,0] - np.sum(tm * np.sum((V - (np.ones((n_clust,1)) * VG))**(2), axis=1))  # Fukuyama-Sugeno index
         PI = (np.sum(((DD**(2)) * Um).T, axis=0)) / (np.sum(U.T, axis=0))
         
         SI = np.zeros((1,n_clust))
         for i in range(n_clust):
             SI[0,i] = np.sum(np.sum(((V - np.ones((n_clust,1)) * V[i,:])**(2)).T, axis=0), axis=0)
         
-        SC = np.sum(PI/SI)
+        SC = np.sum(PI/SI)          # Bezdek index
         PI = (np.sum(((DD**(2)) * Um).T, axis=0)) / (np.sum(Um.T, axis=0))
         PI = PI * np.sum(U.T, axis=0)
         nt = np.sum(U.T, axis=0)
@@ -224,7 +241,7 @@ class ANNBFIS:
             ni = nt + nt[i]
             SI[0,i] = np.sum(np.sum(((V - (np.ones((n_clust,1)) * V[i,:]))**(2)).T, axis=0) * ni, axis=0)
         
-        VAL = np.sum(PI/SI)
+        VAL = np.sum(PI/SI)         # a new index
         print(f'X-B: {XB:4f}, F-S: {FS:4f}, SC: {SC:4f}, VAL: {VAL:4f}\n')
 
         S = np.zeros((n_clust,n2))
