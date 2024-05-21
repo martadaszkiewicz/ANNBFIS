@@ -27,7 +27,7 @@ def specify_output(data: pd.DataFrame, thr: None, ref_column: str):
 def normalize_data(data: np.ndarray):
     norm_data = np.copy(data)
 
-    for col in range(len(data.T) - 1):  # leaving output
+    for col in range(len(data.T) - 2):  # leaving output and fuzzy scores
         for row in range(len(data)):
             norm_data[row,col] = (data[row,col] - np.min(data[:,col])) / np.max(data[:,col] - np.min(data[:,col]))
     
