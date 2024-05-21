@@ -36,7 +36,7 @@ def normalize_data(data: np.ndarray):
 def kfold_cv(data: np.ndarray):
     X = data[:,:-1]
     y = data[:,-1]
-    skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=26)
+    skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=2024)
 
     # organise the split:
     fold_sets = {}

@@ -11,14 +11,17 @@ class ANNBFIS:
         (cases in rows, features in columns, output in the last column)
     nrule: int
         number of IF-THEN rules
+    gamma: float
+        convergence coefficient
     
     Methods
     -------
     ...
     '''
-    def __init__(self, data: np.ndarray, nrule: int) -> None:
+    def __init__(self, data: np.ndarray, nrule: int, gamma: float) -> None:
         self.data = data
         self.nrule = nrule
+        self.gamma = gamma
     
     def annbfis(self) -> tuple:
         np.random.seed(2024)            # setting a seed to examine observed results
@@ -43,7 +46,7 @@ class ANNBFIS:
         org_labels = np.copy(self.data[:,m1-1]).reshape(1,-1)
         mod_labels = np.zeros((iter+1,n1))
         mod_labels[0,:] = np.ones((1,n1))
-        gamma = 1.5                             # gamma = (0:0.5:2>
+        # gamma = (0:0.5:2>
         ##############</Classifier based on neurofuzzy system>############## 
         print('- loop under learning epoch.\n')
         for I in range(iter):
@@ -72,8 +75,8 @@ class ANNBFIS:
                 ##############<Classifier based on neurofuzzy system>############## 
                 e_k = org_labels[0,n]*y - mod_labels[I,n]
                 if e_k > 0:
-                    mod_labels[I+1,n] = mod_labels[I,n] + gamma*e_k
-                    y = mod_labels[I,n] + gamma*e_k
+                    mod_labels[I+1,n] = mod_labels[I,n] + self.gamma*e_k
+                    y = mod_labels[I,n] + self.gamma*e_k
                 else:
                     mod_labels[I+1,n] = mod_labels[I,n]
                     y = mod_labels[I,n]
