@@ -43,9 +43,9 @@ class ANNBFIS:
         EE = np.zeros((iter,1))             # criterion error in learning epoch
 
         ##############<Classifier based on neurofuzzy system>############## 
-        org_labels = np.copy(self.data[:,m1-1]).reshape(1,-1)
-        mod_labels = np.zeros((iter+1,n1))
-        mod_labels[0,:] = np.ones((1,n1))
+        phi = np.copy(self.data[:,m1-1]).reshape(1,-1)      # original labels
+        t_0 = np.zeros((iter+1,n1))
+        t_0[0,:] = np.ones((1,n1))
         # gamma = (0:0.5:2>
         ##############</Classifier based on neurofuzzy system>############## 
         print('- loop under learning epoch.\n')
@@ -73,16 +73,14 @@ class ANNBFIS:
                 [y] = (np.dot(aa, mi.T)) / z
 
                 ##############<Classifier based on neurofuzzy system>############## 
-                e_k = org_labels[0,n]*y - mod_labels[I,n]
+                e_k = phi[0,n]*y - t_0[I,n]
                 if e_k > 0:
-                    mod_labels[I+1,n] = mod_labels[I,n] + self.gamma*e_k
-                    y = mod_labels[I,n] + self.gamma*e_k
+                    t_0[I+1,n] = t_0[I,n] + self.gamma*e_k
                 else:
-                    mod_labels[I+1,n] = mod_labels[I,n]
-                    y = mod_labels[I,n]
+                    t_0[I+1,n] = t_0[I,n]
                 ##############</Classifier based on neurofuzzy system>##############
 
-                e = np.abs(self.data[n,m1-1] - y)           # error
+                e = np.abs(t_0[I+1,n] - y)           # error (for the modified desired target value)
                 EE[I,0] = EE[I,0] + e*e
                 if co == 0:                     # LMSE method
                     mi1 = mi / z
@@ -104,6 +102,7 @@ class ANNBFIS:
 
             if co == 1:                         # gradient method 
                 if EEMIN > EE[I,0]:             # the smallest error in this epoch
+                    EEMIN = EE[I,0]
                     Ist = '<--'
                     self.w = (a, ww, c, s)      # parameters to output in a tuple
 
