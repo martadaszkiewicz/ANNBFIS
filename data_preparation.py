@@ -71,26 +71,41 @@ def kfold_cv(data: np.ndarray):
     
     return fold_sets
 
-def apply_fuzzy_score(sets: tuple, delta: float=None, k: float = None, dup: float = None):
+def apply_fuzzy_score(sets: tuple, delta: float=None, k: float = None, target_ratio: float = None):
     train_set, test_set = sets
 
-    # adjustment of the output
+    print('\nratio before (normal : abnormal):')
+    print(f'{np.sum(train_set[:,-1] == -1)/len(train_set[:,-1]):.4} : {np.sum(train_set[:,-1] == 1)/len(train_set[:,-1]):.4}')
+
+    # correcting the label for cases with high degree of certainty
     if delta != None:
-        condition = train_set[:,-2] >= delta
-        train_set[condition,-1] = 1
-    
-    # removing instances
+        # if i want to assess only abnormal:
+        condition_1 = train_set[:,-2] >= delta
+        train_set[condition_1,-1] = 1
+        # if i want to assess normal and abnormal: 
+        condition_2 = train_set[:,-2] < -delta
+        train_set[condition_2,-1] = -1              # but for such dataset, it doesnt change anything
+
+    # removing the records with low degree of certainty
     if k != None:
-        condition = train_set[:,-2] > k
+        # assess only the normal state (negative fuzzy score):
+        condition = (train_set[:, -2] > 0) | (train_set[:, -2] < -k)
         train_set = train_set[condition]
     
-    # duplication of the instances
-    if dup != None:
-        condition = train_set[:,-2] >= dup
-        duplicated_rows = np.copy(train_set[condition])
-        train_set = np.vstack([train_set,duplicated_rows])
-    
-    # removing fuzzy scores from training and testing sets:
+    # duplicating the records with abnormal state to given ratio 
+    if target_ratio != None:
+        # duplicated samples have to satisfy set level of certainty: 
+        condition = train_set[:,-2] >= 0.5
+        duplicated_rows = train_set[condition]      # creating array with possible rows to replication
+
+        while np.sum(train_set[:,-1] == 1)/len(train_set[:,-1]) < target_ratio:
+            # iteratively and randomly adding one record to get closer to the given ratio:
+            train_set = np.vstack([train_set,duplicated_rows[np.random.randint(0, len(duplicated_rows[:,0])),:]])
+
+    print('\nratio after (normal : abnormal):')
+    print(f'{np.sum(train_set[:,-1] == -1)/len(train_set[:,-1]):.4} : {np.sum(train_set[:,-1] == 1)/len(train_set[:,-1]):.4}')
+
+    # removing column with fuzzy scores before the training:
     train_set = np.concatenate((train_set[:, :train_set.shape[1]-2], train_set[:, train_set.shape[1]-1:]), axis=1)
     test_set = np.concatenate((test_set[:, :test_set.shape[1]-2], test_set[:, test_set.shape[1]-1:]), axis=1)
 
