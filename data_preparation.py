@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+from scipy.stats import zscore
 from sklearn.model_selection import StratifiedKFold
 
 
@@ -24,29 +25,30 @@ def specify_output(data: pd.DataFrame, thr: None, ref_column: str):
     
     return data
 
-def normalize_data(data: np.ndarray):
-    norm_data = np.copy(data)
-
-    for col in range(len(data.T) - 2):  # leaving output and fuzzy scores
-        for row in range(len(data)):
-            norm_data[row,col] = (data[row,col] - np.min(data[:,col])) / np.max(data[:,col] - np.min(data[:,col]))
-    
-    return norm_data
-
-def add_fuzzy_scores(data: pd.core.frame.DataFrame, fuzzy_path: str):
+def add_fuzzy_scores(data: pd.DataFrame, fuzzy_path: str):
     # funcion should be applied after specifying the output:
     with open(fuzzy_path, 'r') as file:
         fuzzy_scores = file.readlines()
     fuzzy_scores = np.array([float(line.strip()) for line in fuzzy_scores]).reshape(-1,1)
 
     data['fuzzy_scores'] = fuzzy_scores
+    # swaping the columns to get target at the last column (only for clarity)
     col_names = list(data.columns)
     target_index = col_names.index('target')
     fuzzy_scores_index = col_names.index('fuzzy_scores')
     col_names[target_index], col_names[fuzzy_scores_index] = col_names[fuzzy_scores_index], col_names[target_index]
+
     data = data[col_names]
 
     return data
+
+def zscore_normalize(data: np.ndarray):
+    features = data[:, :-2]
+    normalized_features = zscore(features, axis=0)
+    
+    normalized_data = np.hstack((normalized_features, data[:, -2:]))
+    
+    return normalized_data
 
 def kfold_cv(data: np.ndarray):
     X = data[:,:-1]
