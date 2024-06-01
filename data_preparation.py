@@ -128,13 +128,13 @@ def calculate_metrics(real_labels: np.ndarray, output_labels: np.ndarray):
 
     condition_normal_state = output_labels < 0
     output_labels[condition_normal_state] = -1
-    condition_abnormal_state = output_labels > 0
+    condition_abnormal_state = output_labels >= 0
     output_labels[condition_abnormal_state] = 1
 
-    TP = np.sum((real_labels == -1) & (output_labels == -1))
-    TN = np.sum((real_labels == 1) & (output_labels == 1))
-    FP = np.sum((real_labels == 1) & (output_labels == -1))
-    FN = np.sum((real_labels == -1) & (output_labels == 1))
+    TP = np.sum((real_labels == 1) & (output_labels == 1))
+    TN = np.sum((real_labels == -1) & (output_labels == -1))
+    FP = np.sum((real_labels == -1) & (output_labels == 1))
+    FN = np.sum((real_labels == 1) & (output_labels == -1))
 
     # accuracy
     accuracy = (TP + TN) / (TP + TN + FP + FN) if (TP + TN + FP + FN) != 0 else 0
