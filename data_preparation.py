@@ -121,3 +121,32 @@ def apply_fuzzy_score(sets: tuple, delta: float=None, k: float = None, target_ra
     test_set = np.concatenate((test_set[:, :test_set.shape[1]-2], test_set[:, test_set.shape[1]-1:]), axis=1)
 
     return train_set, test_set
+
+def calculate_metrics(real_labels: np.ndarray, output_labels: np.ndarray):
+    real_labels = real_labels.reshape(-1,1)
+    output_labels = output_labels.reshape(-1,1)
+
+    condition_normal_state = output_labels < 0
+    output_labels[condition_normal_state] = -1
+    condition_abnormal_state = output_labels > 0
+    output_labels[condition_abnormal_state] = 1
+
+    TP = np.sum((real_labels == -1) & (output_labels == -1))
+    TN = np.sum((real_labels == 1) & (output_labels == 1))
+    FP = np.sum((real_labels == 1) & (output_labels == -1))
+    FN = np.sum((real_labels == -1) & (output_labels == 1))
+
+    # accuracy
+    accuracy = (TP + TN) / (TP + TN + FP + FN) if (TP + TN + FP + FN) != 0 else 0
+    # sensitivity/recall
+    recall = TP / (TP + FN) if (TP + FN) != 0 else 0
+    # specificity
+    specificity = TN / (TN + FP) if (TN + FP) != 0 else 0
+    # precision
+    precision = TP / (TP + FP) if (TP + FP) != 0 else 0
+    # f1 score
+    f1_score = 2 * (precision * recall) / (precision + recall) if (precision + recall) != 0 else 0
+
+    print(f'acc: {accuracy:.2f}, recall: {recall:.2f},\nspec: {specificity:.2f}, prec: {precision:.2f}\nf1 score: {f1_score:.2f}')
+
+    return accuracy, recall, specificity, precision, f1_score
