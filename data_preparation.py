@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 from scipy.stats import zscore
-from sklearn.model_selection import StratifiedKFold
+from sklearn.model_selection import StratifiedKFold, train_test_split
 
 
 # raw_dataset = pd.read_csv("raw_data.csv")
@@ -70,6 +70,17 @@ def kfold_cv(data: np.ndarray):
         fold_sets[i] = (current_train_set, current_test_set)
     
     return fold_sets
+
+def train_val_split(train_set: np.ndarray):
+    X = train_set[:, :-1]
+    y = train_set[:, -1]
+
+    X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, stratify=y, random_state=2024)
+
+    train_set = np.hstack((X_train, y_train.reshape(-1, 1)))
+    val_set = np.hstack((X_val, y_val.reshape(-1, 1)))
+
+    return train_set, val_set
 
 def apply_fuzzy_score(sets: tuple, delta: float=None, k: float = None, target_ratio: float = None):
     train_set, test_set = sets
