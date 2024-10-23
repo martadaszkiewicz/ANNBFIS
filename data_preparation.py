@@ -83,7 +83,7 @@ def train_val_split(train_set: np.ndarray):
     return train_set, val_set
 
 def apply_fuzzy_score(sets: tuple, delta: float=None, k: float = None, target_ratio: float = None):
-    train_set, test_set = sets
+    train_set, val_set, test_set = sets
 
     print('\nratio before (normal : abnormal):')
     print(f'{np.sum(train_set[:,-1] == -1)/len(train_set[:,-1]):.4} : {np.sum(train_set[:,-1] == 1)/len(train_set[:,-1]):.4}')
@@ -102,7 +102,7 @@ def apply_fuzzy_score(sets: tuple, delta: float=None, k: float = None, target_ra
         # assess only the normal state (negative fuzzy score):
         condition = (train_set[:, -2] > 0) | (train_set[:, -2] < -k)
         train_set = train_set[condition]
-    
+
     # duplicating the records with abnormal state to given ratio 
     if target_ratio != None:
         # duplicated samples have to satisfy set level of certainty: 
@@ -118,9 +118,10 @@ def apply_fuzzy_score(sets: tuple, delta: float=None, k: float = None, target_ra
 
     # removing column with fuzzy scores before the training:
     train_set = np.concatenate((train_set[:, :train_set.shape[1]-2], train_set[:, train_set.shape[1]-1:]), axis=1)
+    val_set = np.concatenate((val_set[:, :val_set.shape[1]-2], val_set[:, val_set.shape[1]-1:]), axis=1)
     test_set = np.concatenate((test_set[:, :test_set.shape[1]-2], test_set[:, test_set.shape[1]-1:]), axis=1)
 
-    return train_set, test_set
+    return train_set, val_set, test_set
 
 def calculate_metrics(real_labels: np.ndarray, output_labels: np.ndarray):
     real_labels = real_labels.reshape(-1,1)
