@@ -1,8 +1,8 @@
 import numpy as np
 
-class ANNBFIS:
+class CBNFS:
     '''
-    ANNBFIS - Artificial Neural Network Based on Fuzzy Inference System
+    CBNFS - Classifier Based on Neuro-Fuzzy System
 
     Attributes
     ----------
@@ -11,15 +11,19 @@ class ANNBFIS:
         (cases in rows, features in columns, output in the last column)
     nrule: int
         number of IF-THEN rules
+    gamma: float
+        convergence coefficient
     
     Methods
     -------
-    annbfis(self):
+    cbnfs(self):
         initializes premise centers, premise sigma parameters, step-size, 
         and the optimization method. During training, parameters are updated by
         alternating between two optimization methods each epoch: LMS method 
         minimizes the mean squared error in one epoch, followed by the gradient 
         method in the next epoch to update parameters based on the error gradient.
+        This method incorporated the Classifier Based on Neuro-Fuzzy System approach, 
+        which iteratively perform a correction on the output value.
 
     cclust(self, ni: int = 4):
         cclust methos, invoked by annbfis, identifies the best partition using 
@@ -30,41 +34,49 @@ class ANNBFIS:
         employs FCM to determine cluster centers and variability, along with
         other relevant clustering metrics.
 
-    annbfise(self, test_set: np.ndarray):
+    cbnfse(self, test_set: np.ndarray):
         evaluates the CBNFS model on a given test set and returns the classification 
         results.
-    
     '''
-    def __init__(self, data: np.ndarray, nrule: int) -> None:
+    def __init__(self, data: np.ndarray, nrule: int, gamma: float) -> None:
         self.data = data
         self.nrule = nrule
+        self.gamma = gamma
     
-    def annbfis(self) -> tuple:
-        n1, m1 = np.shape(self.data)
-        iter = 100
-        # c, s, cc = self.cclust(self.data[:,:-1], self.nrule, self.nrule, 4)
+    def cbnfs(self) -> tuple:
+        np.random.seed(2024)            # setting a seed to examine observed results
+
+        n1, m1 = np.shape(self.data)        # n1 <- no. cases, m1 <- no. inputs+1
+        iter = 100                          # target no. iterations (epoches)
         c, s, cc = self.cclust(4)
 
-        c = c[:,:m1-1].T
-        s = s[:,:m1-1].T
-        m = cc
-        ss = 0.01
-        a = np.zeros((m1, m))
-        ww = 2* np.ones((1,m))
-        co = 0
-        EEMIN = 1E100
-        lasti = 1
-        lastd = 1
-        EE = np.zeros((iter,1))
+        c = c[:,:m1-1].T                    # premises centers
+        s = s[:,:m1-1].T                    # premises sigma-parameters
+        m = cc                              # no. IF-THEN rules
+        ss = 0.01                           # initial step-size
+        a = np.zeros((m1, m))               # localization of fuzzy sets in consequence
+        ww = 2* np.ones((1,m))              # width of fuzzy sets in consequence
+        co = 0                              # optimization method selector
+        EEMIN = 1E100                       # minimal criterion error
+        lasti = 1                           # last step-size increasing index
+        lastd = 1                           # last step-size decreasing index
+        EE = np.zeros((iter,1))             # criterion error in learning epoch
 
+        ##############<Classifier based on neurofuzzy system>############## 
+        phi = np.copy(self.data[:,m1-1]).reshape(1,-1)      # original labels
+        t_0 = np.zeros((iter+1,n1))
+        t_0[0,:] = np.ones((1,n1))
+        # gamma = (0:0.5:2>
+        ##############</Classifier based on neurofuzzy system>##############
+        
         print('- loop under learning epoch.\n')
         for I in range(iter):
             Ist = ' '
-            if co == 0:
+            if co == 0:                     # LMSE method initialiization
                 P = 10E6 * np.array(np.eye(m1*m), dtype=float)
                 ak = np.zeros((m1*m,1))
 
-            if co == 1:
+            if co == 1:                     # gradient method initialization
                 gc = np.zeros((m1-1,m))
                 gs = np.zeros((m1-1,m))
                 gw = np.zeros((1,m))
@@ -80,12 +92,21 @@ class ANNBFIS:
                 [[z]] = np.dot(np.ones((1,m)), mi.T)
                 aa = np.dot(self.data[n,:m1-1], a[:m1-1,:]) + a[m1-1,:]
                 [y] = (np.dot(aa, mi.T)) / z
-                e = np.abs(self.data[n,m1-1] - y)
+
+                ##############<Classifier based on neurofuzzy system>############## 
+                e_k = phi[0,n]*y - t_0[I,n]
+                if e_k > 0:
+                    t_0[I+1,n] = t_0[I,n] + self.gamma*e_k
+                else:
+                    t_0[I+1,n] = t_0[I,n]
+                ##############</Classifier based on neurofuzzy system>##############
+
+                e = np.abs(t_0[I+1,n] - y)           # error (for the modified desired target value)
                 EE[I,0] = EE[I,0] + e*e
-                if co == 0:
+                if co == 0:                     # LMSE method
                     mi1 = mi / z
                     M = np.append(self.data[n,:m1-1].T,1).reshape(-1,1) * mi1
-                    Rk = M.flatten('F').reshape(-1,1)   
+                    Rk = M.flatten('F').reshape(-1,1)
                     P = P - (np.dot(np.dot(np.dot(P, Rk), Rk.T), P) / (np.dot(np.dot(Rk.T, P), Rk) + 1))
                     
                     ak = ak + np.dot(np.dot(P, Rk), (self.data[n,m1-1] - np.dot(Rk.T, ak)))
@@ -94,17 +115,17 @@ class ANNBFIS:
                         a[:] = ak.reshape(-1,a.shape[0]).T
             
             
-                if co == 1:     # gradient method
+                if co == 1:                     # gradient method
                     ay = (np.ones((m1-1,1))*aa - y) / z
                     gc = gc + np.dot((self.data[n,m1-1] - y), ay) * (np.ones((m1-1,1)) * mi) * (d1 / (s*s))
                     gs = gs + np.dot((self.data[n,m1-1] - y), ay) * (np.ones((m1-1,1)) * mi) * ((d1*d1) / (s*s*s))
                     gw = gw + np.dot((self.data[n,m1-1] - y), ((aa - y) / z)) * (R/2)
 
-            if co == 1:     # a huge if
-                if EEMIN > EE[I,0]:
+            if co == 1:                         # gradient method 
+                if EEMIN > EE[I,0]:             # the smallest error in this epoch
                     EEMIN = EE[I,0]
                     Ist = '<--'
-                    self.w = (a, ww, c, s)   # parameters to output in a tuple
+                    self.w = (a, ww, c, s)      # parameters to output in a tuple
 
                 if (I - lasti) > 8:
                     if (EE[I,0] < EE[I-2,0]) and (EE[I-2,0] < EE[I-4,0]) and (EE[I-4,0] < EE[I-6,0]) and (EE[I-6,0] < EE[I-8,0]):
@@ -118,7 +139,7 @@ class ANNBFIS:
                         lastd = I
                 
                 Sss = ss / np.sqrt(np.sum(gc*gc) + np.sum(gs*gs) + np.sum(gw*gw))
-                c = c + Sss * gc
+                c = c + Sss * gc                # parameters modifications
                 s = s + Sss * gs
                 ww = ww + Sss * gw
             co = np.mod(co+1,2)
@@ -258,9 +279,9 @@ class ANNBFIS:
 
         return V, S, U, XB, FS, SC, VAL
     
-    def annbfise(self, test_set: np.ndarray) -> np.ndarray:
+    def cbnfse(self, test_set: np.ndarray) -> np.ndarray:
         ''' 
-        Method for evaluation of the ANNBFIS model
+        Method for evaluation of the CBNFS model
 
         requires:
         ---------------------------------------------------
@@ -273,7 +294,7 @@ class ANNBFIS:
         '''
 
         if not hasattr(self, 'w'):
-            self.w = self.annbfis()        
+            self.w = self.cbnfs()        
         
         (a, ww, c, s) = self.w
         n1, m1 = np.shape(test_set)
